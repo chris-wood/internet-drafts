@@ -37,14 +37,10 @@ author:
     email: ot-ietf@thibault.uk
 
 normative:
-  EC-ACT:
-    title: "EC-ACT: Anonymous Credit Tokens"
-    target: https://moderation-of-unlinkable-endorsements.github.io/internet-drafts/draft-schlesinger-mole-ec-act.html
   ARCHITECTURE: I-D.draft-jms-mole-architecture
   CDDL: RFC8610
-  EC-IHAT:
-    title: "EC-IHAT: Issuer-Hiding Anonymous Tokens"
-    target: https://moderation-of-unlinkable-endorsements.github.io/internet-drafts/draft-ladd-mole-ec-ihat.html
+  EC-ACT: I-D.draft-schlesinger-mole-ec-act
+  EC-IHAT: I-D.draft-ladd-mole-ec-ihat
   IANA: RFC8126
   LONGFELLOW: I-D.draft-google-cfrg-libzk
   QUIC: RFC9000
@@ -115,7 +111,10 @@ is the variable-length integer of {{Section 16 of QUIC}}, in its shortest
 encoding. A recipient MUST reject a non-shortest length or trailing bytes.
 All constants are in network byte order.
 
-This document uses the following terms for protocol actions:
+This document uses the following terms:
+
+Endorsement:
+: A cryptographic object granted by an Anchor to a Client ({{ARCHITECTURE}}).
 
 Grant:
 : An Anchor gives a Client an Endorsement.
@@ -156,24 +155,10 @@ material is never sent to an Anchor by the Client.
 The value 0x0000 is reserved in both registries and MUST NOT appear on the
 wire. Endorsement type 0x0001 means that no Endorsement is required.
 
-These canonical Challenge encodings are hash inputs, not HTTP payload
-wrappers. Both parties reconstruct them from the selected type and decoded
-type-specific payload, preserving the cryptographic transcripts:
-
-~~~ tls-presentation
-struct {
-  uint16 endorsement_type;
-  opaque challenge<V>;      /* RedemptionChallenge */
-} ModeratorChallenge;
-
-struct {
-  uint16 credential_type;
-  opaque challenge<V>;      /* type-specific Challenge */
-} CredentialChallenge;
-~~~
-
-Hashes cover these bytes, never HTTP parameter names, quoting, or base64url
-text.
+A Moderator Challenge has no payload wrapper. The HTTP challenge parameter
+identifies the endorsement or credential type, and the
+decoded payload is the type-specific Challenge. Hashes cover those decoded
+octets, never HTTP parameter names, quoting, or base64url text.
 
 ## Greasing {#greasing}
 
@@ -211,7 +196,7 @@ selected fields. Moderator Challenge and Context are therefore not
 interchangeable terms.
 
 Each credential protocol defines the contents of its type-specific
-`CredentialChallenge` body. Endorsement protocols use the common Challenge in
+Challenge. Endorsement protocols use the common Challenge in
 {{challenge-binding}}. For a new operation, a Moderator MUST be able to
 verify, from retained state or by recomputing the Challenge, that a response
 uses a Challenge it issued and that remains valid. A credential protocol can return an already accepted result after its
@@ -256,7 +241,7 @@ issuance request in Redeem & Issue ({{credential-protocols}}).
 
 ## Redemption Challenge Binding {#challenge-binding}
 
-The type-specific body of `ModeratorChallenge` is:
+The Moderator Challenge for a redemption is:
 
 ~~~ tls-presentation
 struct {
@@ -284,22 +269,22 @@ challenge_digest = SHA-256(moderator_challenge)
 
 The values are defined as follows:
 
-* `moderator_challenge` is the canonical `ModeratorChallenge` reconstructed
-  from the selected endorsement type and decoded challenge payload ({{common}}).
-  It is not required to contain an origin.
+* `moderator_challenge` is the encoded `RedemptionChallenge`, as decoded
+  from the Moderator Challenge payload ({{common}}). It is not required to
+  contain an origin.
 * `challenge_digest` is the 32-octet SHA-256 digest of
   `moderator_challenge`. It is not computed over a base64url or other textual
   encoding. SHA-256 is defined in {{SHA2}}.
 
 `challenge_digest` enters the Fiat-Shamir transcript in both EC-IHAT and
 Longfellow, but is not a Longfellow circuit public input. A redemption created
-for one `ModeratorChallenge` does not verify under another, so a Moderator
+for one `RedemptionChallenge` does not verify under another, so a Moderator
 that accepts only the `redemption_context` it constructs rejects a
 redemption made under another Moderator's challenge. This does not stop a
 Moderator that relays another Moderator's challenge to the Client.
 
 The `Challenge` algorithm and `ChallengeMessage` in EC-IHAT issuance are
-defined by {{EC-IHAT}} and are unrelated to a `ModeratorChallenge`.
+defined by {{EC-IHAT}} and are unrelated to a `RedemptionChallenge`.
 
 ## Abstract Endorsement API
 
@@ -583,14 +568,14 @@ exchange.
 | Client |                             | Moderator |
 +---+----+                             +-----+-----+
     |                                        |
-    |<--------- ModeratorChallenge ----------+
+    |<-------- RedemptionChallenge ----------+
     +--- Redemption + IssuanceRequest ------>|  HTTP request
     |<---------- IssuanceResponse -----------+
 Finalize                                    |
     |                                        |
    ...                                       |
     |                                        |
-    |<-------- CredentialChallenge ----------+
+    |<-------------- Challenge --------------+
     +-------- PresentationAndUpdate -------->|
     |<-------------- Update? ----------------+
 Finalize                                    |
@@ -683,10 +668,10 @@ Credential type: 0x0001.
 
 An EC-ACT Credential, specified in {{EC-ACT}}, carries a hidden *balance* `c`, a
 number of credits. The Moderator issues a Credential with an initial
-balance of its choosing. A presentation *spends* a public amount `s`,
-proving that the balance covers it, and may accept a *top-up* of at most
-`a` that the challenge offers. In the same exchange the Moderator issues a *refund*
-message with a return amount `t` of its choosing, with `0 <= t <= s + a`.
+balance of its choosing. A presentation spends a public `spend_amount` (`s`),
+proving that the balance covers it, and may accept a top-up of at most
+`max_top_up` (`a`) that the challenge offers. In the same exchange the Moderator issues a *refund*
+message with a `return_amount` (`t`) of its choosing, with `0 <= t <= s + a`.
 The Client finalizes this message into a fresh Credential with balance
 `c - s + t`. The presentation reveals `s`, `a`, and a single-use nullifier;
 the balance is hidden beyond the public amounts and predicates
@@ -743,6 +728,8 @@ Ciphersuite
 
 Balance Width
 : `L`, fixed for the lifetime of the key and credential context ({{EC-ACT}}).
+  Balances and amounts are integers in `[0, 2^L)`. For example, `L = 8`
+  permits values from 0 to 255.
 
 Credential Context
 : `credential_context`, an opaque byte string of at most `2^16 - 2` bytes
@@ -761,10 +748,13 @@ ctx_cred = credential_context || I2OSP(L, 1)
 ~~~
 
 which includes `L` as {{EC-ACT}} recommends. A Moderator expires every
-outstanding Credential under a key by publishing a new `credential_context`,
+outstanding Credential under a key by retiring its `credential_context`,
 without changing the key. A refund is issued under the context of the spent
-Credential, so balances do not carry over to a new context. A Moderator
-SHOULD announce the successor context and a grace period before expiry.
+Credential, so balances do not carry over to a new context. Moderators can
+accept old and new credential contexts during a transition period to ensure
+a seamless transition across clients. Dropping support for an old credential
+context also drops support for clients which have not discovered the new
+credential context.
 Clients obtain Credentials under the new context through Redeem & Issue;
 this document does not specify balance migration.
 
@@ -827,17 +817,17 @@ and the scope of the authorization it asks for:
 
 ~~~ tls-presentation
 struct {
-  uint64 s;
-  uint64 a;
+  uint64 spend_amount;
+  uint64 max_top_up;
   opaque credential_context<V>;
   opaque request_context<V>;
 } Challenge;
 ~~~
 
-`s` is the amount to spend and is the Predicate of {{ARCHITECTURE}}: a
-presentation succeeds only if the balance is at least `s`. `a` is the
-largest top-up the Moderator offers in this presentation, `0` if none. A
-challenge with `s = a = 0` asks for a refresh, which replaces the nullifier
+`spend_amount` is the Predicate of {{ARCHITECTURE}}: a
+presentation succeeds only if the balance is at least `spend_amount`.
+`max_top_up` is the largest top-up the Moderator offers in this presentation,
+`0` if none. A challenge with `s = a = 0` asks for a refresh, which replaces the nullifier
 and leaves the balance unchanged, since `t <= s + a = 0`. A Moderator that
 wants to lower balances challenges with `s > 0` and returns `t < s`; one that
 wants to raise them offers `a > 0`. `credential_context` repeats the
@@ -853,10 +843,9 @@ The spend context of {{EC-ACT}} is
 ctx_spend = SHA-256(credential_challenge)
 ~~~
 
-where `credential_challenge` is the canonical encoding of the
-`CredentialChallenge` ({{common}}), reconstructed with its `credential_type`
-and the length-prefixed EC-ACT `Challenge`. The Client hashes those octets, not
-their base64url encoding. This digest is separate from the redemption digest
+where `credential_challenge` is the encoded EC-ACT `Challenge`, as decoded
+from the Moderator Challenge payload ({{common}}). The Client hashes those
+octets, not their base64url encoding. This digest is separate from the redemption digest
 of {{challenge-binding}}.
 
 The presentation does not carry the challenge. The Moderator determines the
@@ -892,7 +881,8 @@ the message formats, and the nullifier rules are the same.
 
 A Client that holds no Usable Credential ({{ec-act-client-state}}) for this
 Moderator under the challenged `credential_context`, or whose Credential
-`ProveSpend` would reject for the challenged `s` and `a`, does not present.
+`ProveSpend` would reject for the challenged `spend_amount` and `max_top_up`,
+does not present.
 It runs Redeem & Issue, first obtaining an Endorsement if the Moderator
 requires one ({{endorsement-protocols}}).
 
@@ -929,8 +919,8 @@ result, and step 4 follows.
    an unrecorded nullifier proceeds to step 2.
 2. It determines the challenge ({{ec-act-challenge-binding}}), and checks
    that its `credential_context` is accepted for that key and that
-   `spend.s` and `spend.a` equal its `s` and `a`. It rejects the presentation
-   if any check fails.
+   `spend.s` and `spend.a` equal its `spend_amount` and `max_top_up`. It rejects
+   the presentation if any check fails.
 3. It runs `VerifySpend(skM, ctx_cred, ctx_spend, spend)`, decides under its
    policy whether to refund and, if so, the return amount `t`, and runs
    `IssueRefund(skM, ctx_cred, spend, t)` if it refunds. It then records the
@@ -1090,9 +1080,8 @@ A token is verified against the `TokenChallenge` of the key it was issued
 under. Initial issuance and replacements use the `TokenChallenge` of the
 issuance key.
 
-The type-specific body of `CredentialChallenge` is the issuance key's
-`TokenChallenge`. A Client MUST reject a `CredentialChallenge` whose
-`TokenChallenge` differs from it. The Client presents a token issued under
+The type-specific Challenge is the issuance key's `TokenChallenge`. A
+Client MUST reject a Challenge that differs from it. The Client presents a token issued under
 any accepted key, and builds `token_request` under the issuance key.
 
 `TokenChallenge` is fixed when the token is issued, before the operation in
@@ -1373,10 +1362,10 @@ Nullifier store:
 
 Amounts:
 : Step 2 of {{ec-act-spend}} requires `spend.s` and `spend.a` to equal the
-  challenge's `s` and `a`. Accepting another `s` would let the Client choose
-  its charge, and accepting a larger `a` would let it choose how far its
-  balance may rise. {{EC-ACT}} gives the range checks that credit conservation
-  needs.
+  challenge's `spend_amount` and `max_top_up`. Accepting another `s` would let
+  the Client choose its charge, and accepting a larger `a` would let it choose
+  how far its balance may rise. {{EC-ACT}} gives the range checks that credit
+  conservation needs.
 
 Credential sharing:
 : Copies of one Credential yield at most one fresh acceptance across all
@@ -1553,13 +1542,13 @@ Moderator.
     +-- GrantChallenges -->|                 |
     |<--- GrantResponses --+                 |
 Finalize                   |                 |
-    |<---------- ModeratorChallenge ---------+
+    |<--------- RedemptionChallenge ---------+
     |   Redemption + IssuanceRequest         |
     +--------------------------------------->|
     |<---------------------------------------+
     |   IssuanceResponse                     |
 Finalize                   |                 |
-    |<--------- CredentialChallenge ---------+
+    |<------------ TokenChallenge -----------+
     |   PresentationAndUpdate                |
     +--------------------------------------->|
     |<---------------------------------------+
@@ -1570,13 +1559,13 @@ Finalize                   |                 |
 
 The grant follows {{ec-ihat}}. The Client finalizes each `ResponseMessage`
 in the `GrantResponses` into an Endorsement. It uses one of them here: it
-obtains a `ModeratorChallenge`, computes its digest,
+obtains a `RedemptionChallenge`, computes its digest,
 and sends the EC-IHAT `Redemption` with a Privacy Pass `TokenRequest` to
 the Redeem & Issue endpoint.
 
 The Moderator verifies the redemption and atomically records its nullifier
 before returning a `TokenResponse`. The Client finalizes it into a Credential.
-On a later request, it obtains a `CredentialChallenge` carrying the configured
+On a later request, it obtains a Challenge carrying the configured
 Privacy Pass `TokenChallenge` and sends `PresentationAndUpdate`.
 
 A fresh acceptance authorizes one attempt of the protected operation. The
@@ -1587,3 +1576,21 @@ the Moderator chose to consume the Credential.
 {:numbered="false"}
 
 TODO acknowledge.
+
+# Changelog
+{:numbered="false"}
+
+draft-jms-mole-protocols-01
+
+* Move cryptographic constructions to separate EC-IHAT and EC-ACT drafts.
+  Specify their protocol profiles, including batched EC-IHAT grants.
+* Define endorsement and credential APIs, redemption challenge binding, and
+  the separation of Moderator Challenges from cryptographic Contexts.
+* Carry type-specific payloads directly and make message encodings independent
+  of the HTTP transport draft.
+* Define atomic presentation processing, retained updates, and recovery by
+  handle without repeating the protected operation.
+* Add configuration schemas, key and context lifetimes, and replay state
+  requirements.
+* Remove Budget Privacy Pass and clarify the privacy and security limitations
+  of the remaining protocols.

@@ -261,6 +261,19 @@ A rejected presentation MUST NOT carry `Mole-Credential`.
 A Client that receives no `Mole-Credential` after sending a presentation
 keeps its pending state and MAY recover ({{recovery}}).
 
+A Moderator may indicate that it is holding the credential update for future
+interactions.
+
+~~~
+Mole-Credential: held-for-update-0001="time"
+~~~
+
+A Client MAY submit a signoff request at any time before duration, or
+a recovery request after. A signoff request implies that the Client
+expects a new challenge on interaction with the site, and will answer
+it. Clients SHOULD send a signoff request before time seconds from
+receiving this response.
+
 Each credential type MUST define the challenge fields that partition cached
 Credentials, or state that its Credentials are not cacheable.
 
@@ -279,6 +292,22 @@ Client identifier. It MUST NOT verify a proof or attempt the protected
 operation. If a result is still retained, it answers `200` with the recorded
 `update-T`, including the empty value for a recorded `NoUpdate`. Otherwise it
 answers `404` without `Mole-Credential`, whether or not a record exists.
+
+## Signoff {#signoff}
+
+A Client MAY send a `POST` with empty content to the Redeem & Issue endpoint it
+stored with the Credential:
+
+~~~
+Authorization: Mole signoff-0001="<recovery-handle>"
+~~~
+
+A MOLE Signoff is different from Recovery in that it implies a future
+challenge will be honored with presentation. Servers SHOULD send back
+an updated credential summarizing the impact of behavior observed
+based on whatever session mechanism they have, and invalidate the
+clearence for that session.
+
 
 ## Status Codes {#status-codes}
 
@@ -347,3 +376,18 @@ in this document.
 {:numbered="false"}
 
 TODO acknowledge.
+
+# Changelog
+{:numbered="false"}
+
+draft-jms-mole-http-transport-01
+
+* Select protocol types in parameter names and carry type-specific payloads
+  directly, removing the outer message wrappers.
+* Separate endorsement redemption from credential issuance parameters and
+  send Redeem & Issue to the configured endpoint.
+* Add recovery by handle and define status codes for fresh presentations,
+  duplicates, and recovery. Distinguish an empty update from a missing response.
+* Specify parameter validation, canonical base64url, caching, and CORS rules.
+* Support batched EC-IHAT grants and require a media type
+  parameter identifying the endorsement type.
