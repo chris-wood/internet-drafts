@@ -1,4 +1,4 @@
-"""Issuer binding and ACT credential update preserve the private tag."""
+"""Issuer binding and ACT credential update preserve the signed hidden Anchor index."""
 
 import pytest
 

@@ -5,11 +5,11 @@ import secrets
 import pytest
 
 from ec_act.feedback import G, H, R
-from ec_act.quality import FIELD128_MODULUS, matches_commitment, split_blinding, tag_point
+from ec_act.quality import FIELD128_MODULUS, index_point, matches_commitment, split_blinding
 
 
-def test_tag_point_binds_private_shares_to_commitment():
-    """Check no carry, field carry, and mismatched tag values."""
+def test_index_point_binds_private_shares_to_commitment():
+    """Check no carry, field carry, and mismatched index values."""
     rho = G.scalar(89)
     left_blind, right_blind = split_blinding(rho, G.scalar(19))
     commitment = G.scalar(2) * H + rho * R
@@ -17,11 +17,11 @@ def test_tag_point_binds_private_shares_to_commitment():
     for left in (0, 1, FIELD128_MODULUS - 1):
         right = (2 - left) % FIELD128_MODULUS
         assert matches_commitment(
-            commitment, tag_point(left, left_blind), tag_point(right, right_blind)
+            commitment, index_point(left, left_blind), index_point(right, right_blind)
         )
 
     assert not matches_commitment(
-        commitment, tag_point(FIELD128_MODULUS - 1, left_blind), tag_point(2, right_blind)
+        commitment, index_point(FIELD128_MODULUS - 1, left_blind), index_point(2, right_blind)
     )
 
 
@@ -37,6 +37,6 @@ def test_real_prio3_input_shares_match_only_the_authorized_commitment():
     index_shares = [index_share(vdaf, ctx, i, share) for i, share in enumerate(input_shares)]
     rho = G.scalar(2025)
     blind_shares = split_blinding(rho, G.scalar(42))
-    points = [tag_point(index, blind) for index, blind in zip(index_shares, blind_shares)]
+    points = [index_point(index, blind) for index, blind in zip(index_shares, blind_shares)]
     assert matches_commitment(G.scalar(2) * H + rho * R, *points)
     assert not matches_commitment(G.scalar(3) * H + rho * R, *points)

@@ -6,7 +6,7 @@ import secrets
 import pytest
 
 from ec_act import feedback, protocol as act
-from ec_act.quality import matches_commitment, split_blinding, tag_point
+from ec_act.quality import index_point, matches_commitment, split_blinding
 from ec_ihat import bound, protocol as ihat
 
 
@@ -62,14 +62,14 @@ def test_endorsed_anchor_is_the_reported_histogram_bucket():
 
     # Existing one-round Prio3 request: the Leader sends its verifier share
     # together with a point computed from the SAME input share.
-    leader_point = tag_point(index_share(vdaf, context, 0, leader_input), blind_shares[0])
+    leader_point = index_point(index_share(vdaf, context, 0, leader_input), blind_shares[0])
     leader_state, leader_verifier_share = vdaf.verify_init(
         verify_key, context, 0, None, nonce, public_share, leader_input
     )
 
     # The Helper relies on the already verified MOLE presentation, expands its
     # actual input share, and checks both bindings before forming the response.
-    helper_point = tag_point(index_share(vdaf, context, 1, helper_input), blind_shares[1])
+    helper_point = index_point(index_share(vdaf, context, 1, helper_input), blind_shares[1])
     helper_state, helper_verifier_share = vdaf.verify_init(
         verify_key, context, 1, None, nonce, public_share, helper_input
     )

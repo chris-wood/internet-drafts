@@ -2,8 +2,8 @@
 
 In one-round Prio3, the Leader sends its locally computed point with its
 verifier share; the Helper returns its point with the verifier message.
-Each projects an index share from its own private one-hot histogram share, and both must enforce
-Prio3 validity and this check before accumulating an output share. This
+Each projects an index share from its own share of the one-hot histogram;
+both must enforce Prio3 validity and this check before accumulating an output share. This
 module models group arithmetic, not DAP wire messages or constant-time code.
 """
 
@@ -23,13 +23,13 @@ def split_blinding(rho: Scalar, mask: Scalar) -> tuple[Scalar, Scalar]:
     return mask, rho - mask
 
 
-def tag_point(tag_share: int, blinding_share: Scalar) -> Element:
-    """Encode only this aggregator's canonical field share as a group point."""
+def index_point(index_share: int, blinding_share: Scalar) -> Element:
+    """Encode this aggregator's canonical projected index share as a group point."""
     if G.Order() <= 2 * FIELD128_MODULUS:
         raise ValueError("commitment group is too small for the VDAF field")
-    if not 0 <= tag_share < FIELD128_MODULUS:
-        raise ValueError("noncanonical tag share")
-    return G.scalar(tag_share) * H + blinding_share * R
+    if not 0 <= index_share < FIELD128_MODULUS:
+        raise ValueError("noncanonical index share")
+    return G.scalar(index_share) * H + blinding_share * R
 
 
 def matches_commitment(commitment: Element, left: Element, right: Element) -> bool:
