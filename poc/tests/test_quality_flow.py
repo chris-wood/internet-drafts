@@ -60,8 +60,8 @@ def test_endorsed_anchor_is_the_reported_histogram_bucket():
     leader_input = vdaf.decode_input_share(0, vdaf.encode_input_share(input_shares[0]))
     helper_input = vdaf.decode_input_share(1, vdaf.encode_input_share(input_shares[1]))
 
-    # Existing one-round Prio3 request: the Leader sends its verifier share
-    # together with a point computed from the SAME input share.
+    # DAP request extension: the Leader sends its ordinary verifier share
+    # and a point computed from the SAME input share.
     leader_point = index_point(index_share(vdaf, context, 0, leader_input), blind_shares[0])
     leader_state, leader_verifier_share = vdaf.verify_init(
         verify_key, context, 0, None, nonce, public_share, leader_input
@@ -80,8 +80,8 @@ def test_endorsed_anchor_is_the_reported_histogram_bucket():
     assert not matches_commitment(commitment + bound.H, leader_point, helper_point)
     helper_output = vdaf.verify_next(context, helper_state, message)
 
-    # Existing Prio3 response: the Helper returns the verifier message and
-    # its point. The Leader checks both before accepting its output share.
+    # Proposed versioned DAP response: the Helper returns the ordinary Prio3
+    # verifier message and its point. The Leader checks both before counting.
     assert not matches_commitment(commitment, leader_point, helper_point + bound.H)
     assert matches_commitment(commitment, leader_point, helper_point)
     leader_output = vdaf.verify_next(context, leader_state, message)
