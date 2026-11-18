@@ -57,7 +57,8 @@ Upstream code is imported unchanged and is not part of our lint targets.
 
 The experimental Anchor-bound quality proof and group check are in
 `src/ec_ihat/bound.py`, `src/ec_act/feedback.py`, and `src/ec_act/quality.py`.
-The latter uses the separate Prio3 circuit in the VDAF reference repository.
+The latter uses ordinary Prio3Histogram and the index-share projection helper
+in the VDAF reference repository; it adds no private tag to the VDAF input.
 With that repository checked out beside `mole-drafts`, run the cross-protocol
 reference test from this directory:
 

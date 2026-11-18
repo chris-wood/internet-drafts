@@ -43,8 +43,9 @@ measure endorsement issuance volume or per-client endorsement rates.
 A reporting task fixes a Moderator key and credential context, an ordered,
 nonempty Anchor public-key list, an epoch, origin, label-policy identifier,
 time bucket, group ciphersuite, two aggregation-service keys, and a VDAF
-algorithm identifier. This profile selects the two-aggregator Field128
-Commitment-Bound Prio3Histogram with one proof; Field64 is not specified.
+algorithm identifier. This profile selects ordinary two-aggregator Field128
+Prio3Histogram with one proof; Field64 is not specified. The commitment check
+is an additional application-protocol step, not a new VDAF algorithm.
 The Anchor at position `i` has a 1-based tag `j=i+1`.
 The list and epoch are authenticated and frozen for a credential's lifetime;
 rotation requires a fresh task and credential context. Clients MUST reject a
@@ -130,16 +131,26 @@ presentation MUST NOT authorize a report.
 
 # Aggregation and Quality Labels {#aggregation}
 
-Each report uses the Commitment-Bound Prio3Histogram variant: its private
-one-hot bucket and private tag agree, and two aggregators verify that their
-tag shares and commitment-blinding shares add to `C_report` (or to
-`C_report + p*Ha` if the canonical Field128 tag shares carry, where `p` is
-the field modulus). A proposed public DAP report extension carries the
+Each report uses ordinary Prio3Histogram. For their respective private
+shares `x_m[u]` of the one-hot measurement, the two aggregators locally compute
+`t_m = sum((u+1)*x_m[u]) mod p`, where `p` is the Field128 modulus.
+The normal Prio3 proof ensures the combined histogram is one-hot, so the
+two projected shares sum to the selected Anchor's 1-based bucket index
+modulo `p`. They verify that the points formed from their OWN projected
+index shares and commitment-blinding shares add to `C_report` (or to
+`C_report + p*Ha` if the canonical Field128 index shares carry). Neither
+an additional private tag nor a new VDAF algorithm identifier is needed.
+The commitment check remains mandatory. A proposed public DAP report
+extension carries the
 canonical `C_report` in report metadata visible to BOTH aggregators. Each
 HPKE-encrypted `PlaintextInputShare` carries the VDAF input share as its
 payload and a proposed private extension carrying that aggregator's scalar
 blinding share. The DAP `report_id` is the VDAF nonce; the task ID selects
 the task in the DAP reports URL. No second report identifier is required.
+Neither aggregator receives the full report blinding scalar, nor the other
+aggregator's raw projected index share: knowing the full blinding scalar
+would reveal the small-domain index by enumerating candidates against
+`C_report`. The points exchanged below do not disclose the scalar shares.
 
 The Client submits the ACT presentation, authenticated origin outcome receipt,
 and exact encoded DAP `Report` in ONE proposed combined submission. The spend
@@ -157,7 +168,8 @@ The Moderator is the DAP Leader and Collector. In an extended
 its Prio3 verifier share and its locally computed point `P_0`, plus an
 authenticated assertion that the MOLE presentation for the exact task,
 report ID, digest, and `C_report` was accepted. The Helper checks the
-assertion, computes its point `P_1` from its OWN expanded VDAF tag share and
+assertion, computes its point `P_1` from the weighted sum of its OWN expanded
+VDAF histogram share and
 private blinding share, checks Prio3 and the commitment, and returns the
 verifier message and `P_1` in the existing aggregation-job response. The
 Leader completes the same checks. Neither side accumulates an output share
@@ -195,8 +207,9 @@ that proof.
 
 # IANA Considerations {#iana}
 
-This experimental profile reserves no codepoints. Implementations MUST use
-distinct local experimental protocol and VDAF identifiers until allocated.
+This experimental profile reserves no codepoints. It uses ordinary
+Prio3Histogram's existing algorithm identifier; the surrounding MOLE and
+DAP integration requires distinct, versioned protocol identifiers.
 
 --- back
 

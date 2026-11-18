@@ -12,8 +12,10 @@ from ec_ihat import bound, protocol as ihat
 
 def test_endorsed_anchor_is_the_reported_histogram_bucket():
     """Verify the complete reference path through a single quality report."""
-    module = pytest.importorskip("vdaf_poc.vdaf_prio3_commitment_bound")
-    vdaf = module.Prio3CommitmentBoundHistogram(3, 2)
+    module = pytest.importorskip("vdaf_poc.vdaf_prio3")
+    from vdaf_poc.histogram_binding import index_share
+
+    vdaf = module.Prio3Histogram(2, 3, 2)
     keys = [ihat.G.DeriveKeyPair(bytes([i + 1]) * 48, b"anchor")[1] for i in range(3)]
     anchor_sk, _ = ihat.G.DeriveKeyPair(bytes([2]) * 48, b"anchor")
     moderator_sk, moderator_pk = act.G.DeriveKeyPair(bytes([4]) * 48, b"moderator")
@@ -60,14 +62,14 @@ def test_endorsed_anchor_is_the_reported_histogram_bucket():
 
     # Existing one-round Prio3 request: the Leader sends its verifier share
     # together with a point computed from the SAME input share.
-    leader_point = tag_point(vdaf.tag_share(context, 0, leader_input), blind_shares[0])
+    leader_point = tag_point(index_share(vdaf, context, 0, leader_input), blind_shares[0])
     leader_state, leader_verifier_share = vdaf.verify_init(
         verify_key, context, 0, None, nonce, public_share, leader_input
     )
 
     # The Helper relies on the already verified MOLE presentation, expands its
     # actual input share, and checks both bindings before forming the response.
-    helper_point = tag_point(vdaf.tag_share(context, 1, helper_input), blind_shares[1])
+    helper_point = tag_point(index_share(vdaf, context, 1, helper_input), blind_shares[1])
     helper_state, helper_verifier_share = vdaf.verify_init(
         verify_key, context, 1, None, nonce, public_share, helper_input
     )

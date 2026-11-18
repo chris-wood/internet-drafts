@@ -1,8 +1,8 @@
-"""Experimental application-level binding of VDAF tag shares to ACT.
+"""Experimental application-level binding of projected histogram index shares to ACT.
 
 In one-round Prio3, the Leader sends its locally computed point with its
 verifier share; the Helper returns its point with the verifier message.
-Each uses its own untruncated, private tag share, and both must enforce
+Each projects an index share from its own private one-hot histogram share, and both must enforce
 Prio3 validity and this check before accumulating an output share. This
 module models group arithmetic, not DAP wire messages or constant-time code.
 """
@@ -14,7 +14,7 @@ from ec_ihat.ciphersuite import P256Scalar as Scalar
 
 from .feedback import G, H, R
 
-# The modulus of the Field128 used by the commitment-bound Prio3 circuit.
+# The modulus of Field128 used by vanilla Prio3Histogram.
 FIELD128_MODULUS = 2**66 * 4611686018427387897 + 1
 
 

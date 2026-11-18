@@ -26,15 +26,17 @@ def test_tag_point_binds_private_shares_to_commitment():
 
 
 def test_real_prio3_input_shares_match_only_the_authorized_commitment():
-    """Run with the VDAF reference poc on PYTHONPATH to exercise both repos."""
-    module = pytest.importorskip("vdaf_poc.vdaf_prio3_commitment_bound")
-    vdaf = module.Prio3CommitmentBoundHistogram(3, 2)
+    """Project index shares from the vanilla VDAF histogram input shares."""
+    module = pytest.importorskip("vdaf_poc.vdaf_prio3")
+    from vdaf_poc.histogram_binding import index_share
+
+    vdaf = module.Prio3Histogram(2, 3, 2)
     ctx = b"origin.example/quality/v1"
     nonce = secrets.token_bytes(vdaf.NONCE_SIZE)
     _, input_shares = vdaf.shard(ctx, 1, nonce, secrets.token_bytes(vdaf.RAND_SIZE))
-    tag_shares = [vdaf.tag_share(ctx, i, share) for i, share in enumerate(input_shares)]
+    index_shares = [index_share(vdaf, ctx, i, share) for i, share in enumerate(input_shares)]
     rho = G.scalar(2025)
     blind_shares = split_blinding(rho, G.scalar(42))
-    points = [tag_point(tag, blind) for tag, blind in zip(tag_shares, blind_shares)]
+    points = [tag_point(index, blind) for index, blind in zip(index_shares, blind_shares)]
     assert matches_commitment(G.scalar(2) * H + rho * R, *points)
     assert not matches_commitment(G.scalar(3) * H + rho * R, *points)
