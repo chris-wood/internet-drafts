@@ -17,6 +17,7 @@ normative:
   MOLE: I-D.draft-jms-mole-protocols
   EC-IHAT: I-D.draft-ladd-mole-ec-ihat
   EC-ACT: I-D.draft-schlesinger-mole-ec-act
+  DAP: I-D.draft-ietf-ppm-dap
   VDAF: I-D.draft-irtf-cfrg-vdaf
 ...
 
@@ -155,7 +156,8 @@ would reveal the small-domain index by enumerating candidates against
 The Client submits the ACT presentation, authenticated origin outcome receipt,
 and exact encoded DAP `Report` in ONE proposed combined submission. The spend
 proof's transcript binds the task, report ID, origin, label-policy version,
-and a digest of that whole report, including `C_report` and BOTH HPKE
+and the companion DAP profile's domain-separated SHA-256 digest of that
+whole report, including `C_report` and BOTH HPKE
 ciphertexts. The Moderator checks that the commitment in the ACT proof is
 the one in the report's public extension, the origin's authenticated label,
 the digest, and the credential and report replay rules. A digest identifies
@@ -169,15 +171,17 @@ its Prio3 verifier share and its locally computed point `P_0`, plus an
 authenticated assertion that the MOLE presentation for the exact task,
 report ID, digest, and `C_report` was accepted. The Helper checks the
 assertion, computes its point `P_1` from the weighted sum of its OWN expanded
-VDAF histogram share and
-private blinding share, checks Prio3 and the commitment, and returns the
-verifier message and `P_1` in the existing aggregation-job response. The
+VDAF histogram share and private blinding share, checks Prio3 and the
+commitment, and returns the verifier message and `P_1` in the new versioned
+aggregation-job response. The
 Leader completes the same checks. Neither side accumulates an output share
 unless both checks succeed. This extends the EXISTING Prio3 one-request/
-one-response exchange; it does not introduce a second round trip. The
-combined transport, assertion, report extensions, point fields, and failure
-and retry semantics require a DAP integration specification; ordinary DAP
-does not implement them.
+one-response exchange; it does not introduce a second round trip. DAP has
+an aggregation-job request extension but no corresponding response extension;
+returning `P_1` requires a versioned DAP response encoding, not a change to
+the Prio3 verifier message. The companion DAP histogram commitment-binding
+proposal describes these report and aggregation message extensions. Ordinary
+DAP does not implement them.
 
 An origin, not the Client, supplies an authenticated quality label and
 policy version. Counts are scoped by origin and label policy, never pooled
